@@ -1,0 +1,90 @@
+Restart Project Checklist
+-------------------------------------
+-------------------------------------
+
+1. Start the central server
+
+cd D:\project\core\server
+
+python server.py --checkpoint "D:\project\modules\crowd_density\models\density_synthetic_density.pt"
+
+--------------------
+
+Verify from another PowerShell:
+
+curl.exe http://localhost:8000/health
+
+expected: {"status":"ok"}
+
+------------------------------------------
+-----------------------------------------
+
+2. ngrok http 8000
+
+Test it: 
+curl.exe -H "ngrok-skip-browser-warning: true" https://YOUR-NGROK-URL/health
+
+********************************
+⚠️ If the ngrok URL changed
+API_BASE_URL = "https://YOUR-NEW-NGROK-URL"
+********************************
+
+3. Start/check your MQTT broker
+
+Check:
+
+netstat -ano | findstr :1883
+
+----------------------------------
+----------------------------------
+
+full startup order
+
+PC starts
+   ↓
+Central server :8000
+   ↓
+ngrok → :8000
+   ↓
+Mosquitto :1883
+   ↓
+ESP8266
+   ↓
+Alexa/Lambda
+
+---------------------------------------
+
+Test MQTT:
+mosquitto_pub -h YOUR-PC-IP -t crowd/zone1/tier -m critical
+
+*********************************************************
+
+Set your Wifi to - GABRIEL
+
+To Check Arduino UNO, ESP32, ESP8266 
+CMD 1 --- 
+mosquitto_pub -h YOUR-PC-IP -t crowd/zone1/tier -m critical
+
+
+Python code 
+CMD 2 ---
+python server.py --checkpoint "D:\project\modules\crowd_density\models\density_synthetic_density.pt"
+
+or
+
+python server.py --checkpoint "..\..\modules\crowd_density\models\density_synthetic_density.pt"
+
+
+ngrok
+
+CMD 3 ---
+ngrok http 8000
+
+
+to turn on Camera feed ---
+python server.py --backend yolo --camera 1 --loiter-time 5
+
+to check it on screen ---
+http://localhost:8000/
+
+

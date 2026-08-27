@@ -1,0 +1,15 @@
+data:
+  raw_dir: "data/raw"
+  dataset: "synthetic_density"
+  image_size: 256
+  downsample: 8      # must match model.py's 3x maxpool = /8
+  sigma: 4
+
+model:
+  batch_size: 8
+  epochs: 15
+  learning_rate: 0.0001
+
+density:
+  capacity: 100       # people count treated as "100% density" for this camera/site
+                        # SET THIS per real deployment based on the actual monitored area
