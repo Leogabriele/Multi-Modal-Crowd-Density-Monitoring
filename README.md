@@ -154,7 +154,7 @@ Open **`http://localhost:8000/`** in your browser to access:
 If you find this project useful in your research, please cite:
 ```bibtex
 @misc{urban_monitoring_cps_2026,
-  author = {Gabriel, J.},
+  author = {Jegan, Nadar},
   title = {Multi-Modal Cyber-Physical Crowd Density & Urban Surveillance System},
   year = {2026},
   publisher = {GitHub},
