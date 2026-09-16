@@ -1,169 +1,213 @@
-# Multi-Modal Cyber-Physical Crowd Density & Urban Surveillance System
+# An IoT-Integrated Multi-Modal Crowd Density Monitoring and Alerting System Using Heterogeneous Edge Devices
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch CUDA 12.1](https://img.shields.io/badge/PyTorch-CUDA%2012.1-EE4C2C.svg)](https://pytorch.org/)
 [![YOLOv8](https://img.shields.io/badge/YOLOv8-ByteTrack-00FFFF.svg)](https://github.com/ultralytics/ultralytics)
 [![MQTT](https://img.shields.io/badge/MQTT-Mosquitto%20v2.0-660099.svg)](https://mosquitto.org/)
+[![Hardware](https://img.shields.io/badge/Hardware-ESP32%20%7C%20ESP8266%20%7C%20UNO-orange.svg)](https://www.arduino.cc/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An end-to-end, edge-to-cloud **Cyber-Physical System (CPS)** for real-time crowd density estimation, spatial hazard zoning, and closed-loop microcontroller actuation. Built for academic research in intelligent transportation systems, smart cities, and edge AI surveillance.
+> **Research Publication Reference:**  
+> **Title:** *An IoT-Integrated Multi-Modal Crowd Density Monitoring and Alerting System Using Heterogeneous Edge Devices*  
+> **Authors:** **Jegan Nadar** & **Shilpa Gupta**  
+> **Affiliation:** Department of Artificial Intelligence and Machine Learning Engineering, SIES Graduate School of Technology, Navi Mumbai, India  
+> **Contact:** `jegann@sies.edu.in` | `shilpag@sies.edu.in`
 
 ---
 
-## 🏛️ System Architecture
+## 📄 Abstract & Research Overview
+Public-safety monitoring is needed in places such as transport facilities, markets, campuses, **swimming-pool surroundings**, and event spaces. In such settings, detecting a person is only the first step; the observed scene must also be converted into an event that can reach different low-cost devices in time.
+
+This project presents an end-to-end Cyber-Physical System (CPS) integrating **YOLO vision inference with persistent track IDs**, **user-configurable virtual restricted zones**, a **dwell-time rule for loitering detection**, **MQTT publish-subscribe distribution**, and **heterogeneous IoT hardware** (ESP8266, ESP32, Arduino UNO). Because the Arduino UNO has no native WiFi interface, an ESP32 is deployed as a **network-to-UART serial bridge** to trigger physical servo-gate interlocks and audible buzzer alarms.
 
 ```
-                                      ┌──────────────────────────────────────────────┐
-                                      │        AMAZON ALEXA CLOUD / ASK SDK          │
-                                      │ (Voice Query: "How busy is zone one?")       │
-                                      └──────────────────────▲───────────────────────┘
-                                                             │ HTTPS (ngrok tunnel)
-                                                             │
- ┌───────────────────────────┐         ┌─────────────────────▼────────────────────────┐
- │   CANON EOS 700D DSLR     │  USB    │       EDGE VISION INFERENCE SERVER           │
- │ (🎥 720p/1080p DirectShow)├────────►│ • YOLOv8 Multi-Object Persistent ByteTrack  │
- └───────────────────────────┘         │ • Dilated DensityNet (ShanghaiTech Part B)   │
-                                       │ • HSV Swimming Pool Water Body Segmentation  │
-                                       │ • Green CPS Energy & Bandwidth Profiler      │
-                                       │ • Web Visualizer (:8000) & Security Event Log│
-                                       └─────────────────────┬────────────────────────┘
-                                                             │ MQTT Pub/Sub (Port 1883)
-                                                             │
-                        ┌────────────────────────────────────┴────────────────────────────────────┐
-                        ▼                                                                         ▼
-           ┌─────────────────────────┐                                               ┌─────────────────────────┐
-           │     ESP8266 NodeMCU     │                                               │       ESP32 Bridge      │
-           │  • Wi-Fi MQTT Client    │                                               │  • Wi-Fi MQTT Client    │
-           │  • Tri-Color RGB LED    │                                               │  • Hardware UART Bridge │
-           │    (Green/Yellow/Red)   │                                               └────────────┬────────────┘
-           └─────────────────────────┘                                                            │ UART Serial2 (9600 baud)
-                                                                                                  ▼
-                                                                                     ┌─────────────────────────┐
-                                                                                     │    ARDUINO UNO R3       │
-                                                                                     │  • PWM Servo Gate (0-90)│
-                                                                                     │  • Audio Buzzer Siren   │
-                                                                                     └─────────────────────────┘
++---------------------------------------------------------------------------------------------------------+
+|                                        SYSTEM ARCHITECTURE OVERVIEW                                     |
++---------------------------------------------------------------------------------------------------------+
+
+  [ Camera Input ] (Canon EOS 700D DSLR / Webcam @ 1280x720)
+         │
+         ▼
+  [ Central Edge Server ] (FastAPI + OpenCV + YOLOv8 Tracking + Dilated DensityNet)
+         │
+         ├───► [ Virtual Zone & Dwell Time Logic ] ──► Loitering Trigger (TL >= 5.0s)
+         │
+         ├───► [ HTTP REST API (:8000) ] ──────► [ Web Dashboard & Live MJPEG Stream ]
+         │                                      └──► [ Amazon Alexa Voice Assistant (ASK SDK) ]
+         │
+         └───► [ Eclipse Mosquitto MQTT Broker ] (Port 1883)
+                     │
+                     ├───► [ ESP8266 NodeMCU ] ────────► Tri-Color RGB LED Status
+                     │
+                     └───► [ ESP32 Bridge ] ───────────► [ Arduino UNO R3 (UART Serial2) ]
+                                                               ├──► PWM Servo Gate (0°/90°)
+                                                               └──► Audible Alarm Siren (Buzzer)
++---------------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 🌟 Key Research & Engineering Innovations
+## 🔬 Mathematical Formulation & Processing Logic
 
-### 1. Dual-Paradigm Multi-Scale Vision AI
-* **Micro-Surveillance (1–30 People):** Ultralytics YOLOv8 with ByteTrack persistent identity association for dwell-time tracking, loitering alarms, stray animals (dogs/cats), and vehicle classification (cars, trucks, buses, motorcycles, bicycles).
-* **Macro-Surveillance (30–500+ People):** Custom `LightDensityNet` utilizing dilated convolutional layers trained on the **ShanghaiTech Part B** crowd counting benchmark (88,272 ground-truth heads across 716 images).
-* **Automated Water & Pool Hazard Segmentation:** Autonomous HSV color-space and morphological convex contour extraction to automatically detect swimming pools and enforce water-safety loitering boundaries.
+### 1. Virtual Restricted Zone Membership
+For track identity $i$, let $(x_i(t), y_i(t))$ represent its normalized spatial position at time $t$. Given normalized region bounds $(x_1, y_1, x_2, y_2)$, the inside/outside decision $Z_i(t)$ is defined as:
 
-### 2. Closed-Loop Hardware Interlock (Edge Actuation)
-* Real-time threat escalation: When density exceeds critical capacity or a loitering timer expires (>5.0s), the system issues a `TIER:critical` command via MQTT.
-* The ESP32 forwards this state to an **Arduino UNO R3**, causing an automatic **Servo Gate Closure (0°)** and sounding an **Audible Alarm Siren**.
+$$Z_i(t) = \begin{cases} 1, & x_1 \le x_i(t) \le x_2, \; y_1 \le y_i(t) \le y_2 \\ 0, & \text{otherwise} \end{cases}$$
 
-### 3. Green Cyber-Physical Systems (CPS) Bandwidth Conservation
-* Quantitatively analyzes edge-to-MQTT metadata transmission against centralized 1080p raw video streaming.
-* Achieves **>99.98% network bandwidth reduction** (~1.2 kbps vs. 10.0 Mbps) and avoids **>98% of network transmission carbon footprint**.
+### 2. Dwell-Time Accumulation & Loitering Decision
+When $Z_i(t) = 1$, the initial entry timestamp is recorded as $s_i$. The accumulated residence time $\Delta_i(t)$ and loitering event decision $L_i(t)$ under threshold $T_L = 5.0\text{s}$ are:
 
-### 4. Cloud Voice Assistance (Amazon Alexa ASK SDK)
-* Custom Alexa Skill deployed via AWS Lambda connecting to the local server over secure tunneling to query live crowd counts, capacity percentages, and loitering status.
+$$\Delta_i(t) = t - s_i$$
 
----
+$$L_i(t) = Z_i(t) \wedge \left[ \Delta_i(t) \ge T_L \right]$$
 
-## 📊 Academic Benchmarks (NVIDIA GeForce RTX 2050 GPU)
+### 3. Capacity Density Metric
+With $N_t$ active tracked individuals and reference area capacity $C$:
 
-| Metric | Measured Result | Benchmark Significance |
-| :--- | :---: | :--- |
-| **Inference Latency** | **5.01 ms** (~**199.5 FPS**) | Real-time edge processing capability |
-| **Model Footprint** | **2.01 MB** (526,881 params) | Green AI / Ultra-lightweight edge deployment |
-| **Crowd Dataset** | **ShanghaiTech Part B** | 716 high-resolution street images (88,272 heads) |
-| **Network Conservation** | **99.98%** Bandwidth Saved | Reduces city-scale load from 108 TB/day to 1.2 GB/day |
-| **Hardware Bridge** | **< 12 ms** Latency | Sub-frame latency from threat detection to servo actuation |
+$$D_t = 100 \times \frac{N_t}{C} \%$$
+
+### 4. End-to-End Alert Latency
+$$T_{\text{e2e}} = t_{\text{actuation}} - t_{\text{event}}$$
 
 ---
 
-## 🚀 Quickstart Guide
+## 🔄 Runtime Processing Sequence (Figure 2 in Paper)
 
-### 1. Clone & Install Dependencies
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│ Camera Frame │ ──► │ YOLO Person  │ ──► │   Track-ID   │ ──► │ Virtual Zone │ ──► │ Dwell-Time / │
+│ Acquisition  │     │  Detection   │     │ Association  │     │  Membership  │     │  Loitering   │
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘     └──────┬───────┘
+                                                                                           │
+┌──────────────┐     ┌─────────────────────────────────────────────────────────────────────▼───────┐
+│ Multi-Modal  │ ◄── │ Unified Event State: Count + Density Tier + Loitering Threat State          │
+│ Distribution │     └─────────────────────────────────────────────────────────────────────────────┘
+└──────┬───────┘
+       ├──► Web Dashboard Telemetry & Live Video Feed (8.5 - 9.2 FPS)
+       ├──► ESP8266 Visual LED Indicator (Green / Yellow / Red)
+       ├──► ESP32 -> UART -> Arduino UNO (Physical Servo Gate Closure + Buzzer Siren)
+       └──► Amazon Alexa Voice Skill (On-Demand Speech Query)
+```
+
+---
+
+## 📊 Experimental Results & Prototype Telemetry
+
+### Table I: Accuracy & Diagnostic Audit
+| Operating Condition | Ground Truth (GT) | True Positives (TP) | False Positives (FP) | False Negatives (FN) | Recall | Mean Absolute Error (MAE) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Normal Operation** | 3 | 1 | 0 | 2 | 33.3% | 2.0 |
+| **Loitering Event** | 3 | 3 | 0 | 0 | **100.0%** | **0.0** |
+| **Zone Configuration** | 3 | 2 | 0 | 1 | 66.7% | 1.0 |
+| **Aggregate Metric** | **9** | **6** | **0** | **3** | **66.7%** | **1.0 person/frame** |
+
+* **Snapshot Precision ($Q_p$):** `100.0%`
+* **Snapshot Recall ($Q_r$):** `66.7%`
+* **Harmonic F1-Score ($Q_f$):** `80.0%`
+
+### Table II: Prototype Runtime Performance
+| System State | Detected People | Capacity Density | Frame Rate (FPS) | Active Threat Alert | Hardware Actuator State |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Normal State** | 1 | 2% | **8.7 FPS** | None | Servo: 90° (Open), LED: Green |
+| **Loitering Alert** | 3 | 6% | **8.5 FPS** | **🚨 LOITERING (1)** | **Servo: 0° (Closed), Buzzer: Beeping** |
+| **Zone Configurator**| 2 | 4% | **9.2 FPS** | None | Dynamic Sliders Active |
+
+---
+
+## 🎯 Virtual Restricted Zone Customizer & Pool Detection
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ 🎯 VIRTUAL RESTRICTED ZONE CONFIGURATOR (Browser UI at http://localhost:8000/)          │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│ [🏊 Auto-Detect Pool]  [🎯 Center Small 30%]  [📦 Center Medium 50%]  [◀️ Left]  [▶️ Right]│
+│                                                                                         │
+│  Left Boundary (X1):   [───●──────────] 8%     Top Boundary (Y1):    [──●───────────] 20%│
+│  Right Boundary (X2):  [────────●─────] 92%    Bottom Boundary (Y2): [─────────●────]100%│
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+* **Interactive Real-Time Sliders:** Operators can modify boundary limits ($x_1, y_1, x_2, y_2$) dynamically via `POST /zone/config` without restarting server processes.
+* **Autonomous Swimming Pool Water Segmentation:** Multi-stage HSV thresholding (Cyan/Azure/Teal) with morphological convex hull clustering to automatically lock onto swimming pools for child/swimmer drowning safety.
+
+---
+
+## 🌿 Green CPS & Edge Transmission Efficiency
+
+| Architectural Paradigm | Transmission Bitrate | 24-Hour Load (100 City Cameras) | Network Carbon Footprint |
+| :--- | :---: | :---: | :---: |
+| **Centralized Cloud Video (1080p Stream)** | `10.00 Mbps` | **`108.00 TB / day`** | High ($\sim 3.08\text{ kg CO}_2\text{/day}$) |
+| **Proposed Edge CPS (Our System)** | **`1.2 – 135 kbps`** | **`~1.2 – 136 GB / day`** | **Near-Zero ($<1.5\text{ g/day}$)** |
+| **Relative Conservation** | **`>99.98%` Saved** | **`>8,000x` Less Traffic** | **`99.98%` Energy Reduction** |
+
+---
+
+## 🚀 Quickstart & Reproduction
+
+### 1. Installation
 ```bash
 git clone https://github.com/Leogabriele/Multi-Modal-Crowd-Density-Monitoring.git
 cd Multi-Modal-Crowd-Density-Monitoring
 
-# Install PyTorch with CUDA acceleration
+# Install PyTorch with CUDA acceleration (NVIDIA RTX 2050 / CUDA 12.1)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 pip install -r core/server/requirements.txt
 ```
 
-### 2. Start Mosquitto MQTT Broker
-```bash
+### 2. Start MQTT Broker & Surveillance Server
+```powershell
+# Terminal 1: Start Mosquitto Broker
 net start mosquitto
-# or: mosquitto -v -p 1883
-```
 
-### 3. Launch Surveillance Server
-```bash
+# Terminal 2: Start Central Server with YOLO & 5s Loitering Timer
 cd core/server
-
-# Mode 1: YOLO Tracking + Loitering + Behavior Analytics (Default)
 python urban_server.py --backend yolo --camera 1 --loiter-time 5
 
-# Mode 2: Automated Swimming Pool Detection & Safety Zoning
-python urban_server.py --backend yolo --camera 1 --auto-pool --loiter-time 5
-
-# Mode 3: Real Crowd Density CNN (ShanghaiTech Trained)
-python urban_server.py --backend density --camera 1
-
-# Mode 4: Dual-Paradigm Hybrid Mode
-python urban_server.py --backend hybrid --camera 1 --loiter-time 5
+# Terminal 3: Start ngrok for Alexa Voice Skill
+ngrok http 8000
 ```
-
-### 4. Access Live Dashboard & Telemetry
-Open **`http://localhost:8000/`** in your browser to access:
-* Live Video Feed with visual bounding boxes, track IDs, and HUD.
-* Dynamic Virtual Zone Configurator (Interactive Sliders & Presets).
-* Real-time Green CPS & Bandwidth Conservation Telemetry.
-* Security Event Log Ticker.
 
 ---
 
-## 📂 Repository Structure
+## 📂 Project Directory Layout
 
 ```
 ├── core/
-│   ├── alexa_skill/lambda/     # AWS Lambda ASK SDK Alexa Skill handler
-│   ├── firmware/               # Microcontroller firmware (.ino)
-│   │   ├── esp8266_led/        # ESP8266 Wi-Fi MQTT RGB indicator
-│   │   ├── esp32_bridge/       # ESP32 MQTT-to-Serial bridge
-│   │   └── arduino_uno_actuator/ # Arduino UNO Servo gate & Buzzer
+│   ├── alexa_skill/lambda/
+│   │   └── lambda_function.py      # AWS Lambda ASK SDK Voice Query Handler
+│   ├── firmware/                   # Microcontroller C++/Arduino Firmware
+│   │   ├── esp8266_led/            # NodeMCU Wi-Fi MQTT RGB Visual Indicator
+│   │   ├── esp32_bridge/           # ESP32 MQTT-to-Serial2 Hardware Bridge
+│   │   └── arduino_uno_actuator/   # Arduino UNO Servo Gate & Siren Actuation
 │   └── server/
-│       ├── urban_server.py     # Main surveillance FastAPI server & streamer
-│       └── requirements.txt    # Python dependencies
+│       ├── urban_server.py         # Main Surveillance Server, Streamer & API
+│       └── requirements.txt        # Server Dependencies
 ├── modules/
-│   ├── behavior_analytics.py   # Restricted zone & loitering tracker
-│   ├── pool_water_segmenter.py # Autonomous swimming pool detector
-│   ├── traffic_animal_analytics.py # Stray animals & vehicle classification
-│   ├── edge_efficiency_analyzer.py # Green CPS bandwidth & carbon profiler
-│   ├── benchmark_bandwidth_efficiency.py # Academic LaTeX table generator
-│   └── crowd_density/          # DensityNet training & dataset tools
-│       ├── scripts/train.py    # GPU accelerated density training pipeline
-│       └── src/model.py        # Dilated CNN architecture
+│   ├── behavior_analytics.py       # Restricted Zone & Loitering Decision Engine
+│   ├── pool_water_segmenter.py     # Automated Swimming Pool Water Body Segmenter
+│   ├── edge_efficiency_analyzer.py # Green CPS Bandwidth & Energy Profiler
+│   ├── benchmark_bandwidth_efficiency.py # Academic LaTeX Table Generator
+│   └── crowd_density/              # Dilated DensityNet & ShanghaiTech CNN
 └── README.md
 ```
 
 ---
 
-## 📜 Citation & Research Reference
+## 📜 Citation
 
-If you find this project useful in your research, please cite:
+If you reference or build upon this research, please cite:
+
 ```bibtex
-@misc{urban_monitoring_cps_2026,
-  author = {Jegan, Nadar},
-  title = {Multi-Modal Cyber-Physical Crowd Density & Urban Surveillance System},
-  year = {2026},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/Leogabriele/Multi-Modal-Crowd-Density-Monitoring}}
+@article{nadar2026iot,
+  title={An IoT-Integrated Multi-Modal Crowd Density Monitoring and Alerting System Using Heterogeneous Edge Devices},
+  author={Nadar, Jegan and Gupta, Shilpa},
+  journal={Department of Artificial Intelligence and Machine Learning Engineering, SIES Graduate School of Technology},
+  year={2026},
+  address={Nerul, Navi Mumbai, India}
 }
 ```
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
