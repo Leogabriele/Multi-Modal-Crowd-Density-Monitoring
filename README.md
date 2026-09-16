@@ -20,30 +20,12 @@ Public-safety monitoring is needed in places such as transport facilities, marke
 
 This project presents an end-to-end Cyber-Physical System (CPS) integrating **YOLO vision inference with persistent track IDs**, **user-configurable virtual restricted zones**, a **dwell-time rule for loitering detection**, **MQTT publish-subscribe distribution**, and **heterogeneous IoT hardware** (ESP8266, ESP32, Arduino UNO). Because the Arduino UNO has no native WiFi interface, an ESP32 is deployed as a **network-to-UART serial bridge** to trigger physical servo-gate interlocks and audible buzzer alarms.
 
-```
-+---------------------------------------------------------------------------------------------------------+
-|                                        SYSTEM ARCHITECTURE OVERVIEW                                     |
-+---------------------------------------------------------------------------------------------------------+
-
-  [ Camera Input ] (Canon EOS 700D DSLR / Webcam @ 1280x720)
-         │
-         ▼
-  [ Central Edge Server ] (FastAPI + OpenCV + YOLOv8 Tracking + Dilated DensityNet)
-         │
-         ├───► [ Virtual Zone & Dwell Time Logic ] ──► Loitering Trigger (TL >= 5.0s)
-         │
-         ├───► [ HTTP REST API (:8000) ] ──────► [ Web Dashboard & Live MJPEG Stream ]
-         │                                      └──► [ Amazon Alexa Voice Assistant (ASK SDK) ]
-         │
-         └───► [ Eclipse Mosquitto MQTT Broker ] (Port 1883)
-                     │
-                     ├───► [ ESP8266 NodeMCU ] ────────► Tri-Color RGB LED Status
-                     │
-                     └───► [ ESP32 Bridge ] ───────────► [ Arduino UNO R3 (UART Serial2) ]
-                                                               ├──► PWM Servo Gate (0°/90°)
-                                                               └──► Audible Alarm Siren (Buzzer)
-+---------------------------------------------------------------------------------------------------------+
-```
+<p align="center">
+  <img src="docs/images/fig1_architecture.png" alt="Figure 1: Implemented Monitoring Architecture" width="750"/>
+</p>
+<p align="center">
+  <em><strong>Figure 1:</strong> Implemented end-to-end monitoring architecture. Vision inference and event decisions are produced on the central processing host and transmitted over MQTT and HTTP to heterogeneous edge actuators, web dashboards, and Amazon Alexa.</em>
+</p>
 
 ---
 
@@ -71,27 +53,18 @@ $$T_{\text{e2e}} = t_{\text{actuation}} - t_{\text{event}}$$
 
 ---
 
-## 🔄 Runtime Processing Sequence (Figure 2 in Paper)
+## 🔄 Runtime Processing Sequence
 
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│ Camera Frame │ ──► │ YOLO Person  │ ──► │   Track-ID   │ ──► │ Virtual Zone │ ──► │ Dwell-Time / │
-│ Acquisition  │     │  Detection   │     │ Association  │     │  Membership  │     │  Loitering   │
-└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘     └──────┬───────┘
-                                                                                           │
-┌──────────────┐     ┌─────────────────────────────────────────────────────────────────────▼───────┐
-│ Multi-Modal  │ ◄── │ Unified Event State: Count + Density Tier + Loitering Threat State          │
-│ Distribution │     └─────────────────────────────────────────────────────────────────────────────┘
-└──────┬───────┘
-       ├──► Web Dashboard Telemetry & Live Video Feed (8.5 - 9.2 FPS)
-       ├──► ESP8266 Visual LED Indicator (Green / Yellow / Red)
-       ├──► ESP32 -> UART -> Arduino UNO (Physical Servo Gate Closure + Buzzer Siren)
-       └──► Amazon Alexa Voice Skill (On-Demand Speech Query)
-```
+<p align="center">
+  <img src="docs/images/fig2_pipeline.png" alt="Figure 2: Runtime Pipeline Processing Sequence" width="750"/>
+</p>
+<p align="center">
+  <em><strong>Figure 2:</strong> Processing sequence used by the prototype, from frame acquisition and YOLO detection to Track-ID association, virtual-zone membership, dwell-time accumulation, and multi-modal edge distribution.</em>
+</p>
 
 ---
 
-## 📊 Experimental Results & Prototype Telemetry
+## 📊 Experimental Results & Diagnostic Audit
 
 ### Table I: Accuracy & Diagnostic Audit
 | Operating Condition | Ground Truth (GT) | True Positives (TP) | False Positives (FP) | False Negatives (FN) | Recall | Mean Absolute Error (MAE) |
@@ -101,9 +74,16 @@ $$T_{\text{e2e}} = t_{\text{actuation}} - t_{\text{event}}$$
 | **Zone Configuration** | 3 | 2 | 0 | 1 | 66.7% | 1.0 |
 | **Aggregate Metric** | **9** | **6** | **0** | **3** | **66.7%** | **1.0 person/frame** |
 
-* **Snapshot Precision ($Q_p$):** `100.0%`
-* **Snapshot Recall ($Q_r$):** `66.7%`
-* **Harmonic F1-Score ($Q_f$):** `80.0%`
+<p align="center">
+  <img src="docs/images/fig3_accuracy.png" alt="Figure 3: Preliminary Accuracy Indicators" width="600"/>
+</p>
+<p align="center">
+  <em><strong>Figure 3:</strong> Preliminary accuracy indicators obtained across test scenarios: <strong>100.0% Precision</strong>, <strong>66.7% Recall</strong>, <strong>80.0% F1-Score</strong>, and <strong>1.0 MAE</strong>.</em>
+</p>
+
+---
+
+## 🖥️ Live Telemetry & Surveillance States
 
 ### Table II: Prototype Runtime Performance
 | System State | Detected People | Capacity Density | Frame Rate (FPS) | Active Threat Alert | Hardware Actuator State |
@@ -112,20 +92,23 @@ $$T_{\text{e2e}} = t_{\text{actuation}} - t_{\text{event}}$$
 | **Loitering Alert** | 3 | 6% | **8.5 FPS** | **🚨 LOITERING (1)** | **Servo: 0° (Closed), Buzzer: Beeping** |
 | **Zone Configurator**| 2 | 4% | **9.2 FPS** | None | Dynamic Sliders Active |
 
+### Visual Comparison: Normal State vs. Loitering Threat State
+
+| Figure 4: Normal Operation State | Figure 5: Loitering Alert State |
+| :---: | :---: |
+| <img src="docs/images/fig4_dashboard_normal.png" alt="Figure 4: Normal Operation Dashboard" width="480"/> | <img src="docs/images/fig5_dashboard_loitering.png" alt="Figure 5: Loitering Alert Dashboard" width="480"/> |
+| *Single person active, 2% capacity density, 8.7 FPS, green normal indicator, physical servo gate open (90°).* | *Three active people, 6% density, 8.5 FPS, warning banner triggered, physical gate closed (0°) & buzzer sounded.* |
+
 ---
 
 ## 🎯 Virtual Restricted Zone Customizer & Pool Detection
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│ 🎯 VIRTUAL RESTRICTED ZONE CONFIGURATOR (Browser UI at http://localhost:8000/)          │
-├─────────────────────────────────────────────────────────────────────────────────────────┤
-│ [🏊 Auto-Detect Pool]  [🎯 Center Small 30%]  [📦 Center Medium 50%]  [◀️ Left]  [▶️ Right]│
-│                                                                                         │
-│  Left Boundary (X1):   [───●──────────] 8%     Top Boundary (Y1):    [──●───────────] 20%│
-│  Right Boundary (X2):  [────────●─────] 92%    Bottom Boundary (Y2): [─────────●────]100%│
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="docs/images/fig6_zone_configurator.png" alt="Figure 6: Virtual Restricted Zone Configurator" width="650"/>
+</p>
+<p align="center">
+  <em><strong>Figure 6:</strong> Virtual restricted-zone configurator. Monitored area coordinates $(x_1=0.08, y_1=0.20, x_2=0.92, y_2=1.00)$ lock dynamically onto swimming pool boundaries without restarting the vision engine.</em>
+</p>
 
 * **Interactive Real-Time Sliders:** Operators can modify boundary limits ($x_1, y_1, x_2, y_2$) dynamically via `POST /zone/config` without restarting server processes.
 * **Autonomous Swimming Pool Water Segmentation:** Multi-stage HSV thresholding (Cyan/Azure/Teal) with morphological convex hull clustering to automatically lock onto swimming pools for child/swimmer drowning safety.
@@ -182,6 +165,8 @@ ngrok http 8000
 │   └── server/
 │       ├── urban_server.py         # Main Surveillance Server, Streamer & API
 │       └── requirements.txt        # Server Dependencies
+├── docs/
+│   └── images/                     # Research Paper Figures and UI Screenshots
 ├── modules/
 │   ├── behavior_analytics.py       # Restricted Zone & Loitering Decision Engine
 │   ├── pool_water_segmenter.py     # Automated Swimming Pool Water Body Segmenter
