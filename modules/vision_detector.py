@@ -10,9 +10,14 @@ Features:
 """
 
 import os
+import sys
 import cv2
 import numpy as np
 import torch
+
+crowd_density_dir = os.path.join(os.path.dirname(__file__), "crowd_density")
+if crowd_density_dir not in sys.path:
+    sys.path.insert(0, crowd_density_dir)
 
 try:
     from ultralytics import YOLO
@@ -22,11 +27,13 @@ except ImportError:
 
 from behavior_analytics import RestrictedZone
 from traffic_animal_analytics import TrafficAnimalAnalyzer
+from pool_water_segmenter import SwimmingPoolDetector
 
 
 class VisionDetector:
     def __init__(self, backend="yolo", checkpoint=None, yolo_model="yolov8n.pt",
-                 conf_threshold=0.35, enable_zones=True, loiter_time=5.0, device=None):
+                 conf_threshold=0.35, enable_zones=True, loiter_time=5.0,
+                 zone_bbox=None, zone_preset=None, auto_pool=False, device=None):
         """
         backend: 'yolo', 'density', or 'hybrid'
         checkpoint: path to DensityNet .pt model
@@ -34,11 +41,16 @@ class VisionDetector:
         conf_threshold: confidence threshold
         enable_zones: enable virtual restricted zones
         loiter_time: seconds before loitering alarm triggers
+        zone_bbox: [xmin, ymin, xmax, ymax] normalized coordinates [0.0 - 1.0]
+        zone_preset: 'center_small', 'center_medium', 'left_half', 'right_half', 'doorway'
+        auto_pool: whether to automatically scan and lock onto swimming pools
         """
         self.backend = backend.lower()
         self.conf_threshold = conf_threshold
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.enable_zones = enable_zones
+        self.auto_pool_enabled = auto_pool
+        self.pool_locked = False
         
         self.PERSON_CLASS_ID = 0
         self.yolo = None
@@ -46,7 +58,15 @@ class VisionDetector:
 
         # Analytics Modules
         self.traffic_analyzer = TrafficAnimalAnalyzer()
-        self.zone = RestrictedZone(name="Restricted Zone A", loiter_threshold_sec=loiter_time) if enable_zones else None
+        self.pool_detector = SwimmingPoolDetector()
+
+        if enable_zones:
+            zone_name = "🏊 Swimming Pool Safety Zone" if auto_pool else "Restricted Zone A"
+            self.zone = RestrictedZone(name=zone_name, bbox=zone_bbox, loiter_threshold_sec=loiter_time)
+            if zone_preset:
+                self.zone.set_preset(zone_preset)
+        else:
+            self.zone = None
 
         if self.backend in ["yolo", "hybrid"]:
             if not YOLO_AVAILABLE:
@@ -55,11 +75,25 @@ class VisionDetector:
             self.yolo = YOLO(yolo_model)
 
         if self.backend in ["density", "hybrid"]:
+            if not checkpoint or not os.path.exists(checkpoint):
+                # Search default model locations
+                base_dir = os.path.dirname(__file__)
+                candidates = [
+                    os.path.join(base_dir, "crowd_density", "models", "best_density_shanghaitech_part_b.pt"),
+                    os.path.join(base_dir, "crowd_density", "models", "density_shanghaitech_part_b.pt"),
+                    os.path.join(base_dir, "crowd_density", "models", "best_density_synthetic_density.pt"),
+                    os.path.join(base_dir, "crowd_density", "models", "density_synthetic_density.pt"),
+                ]
+                for cand in candidates:
+                    if os.path.exists(cand):
+                        checkpoint = cand
+                        break
+
             if checkpoint and os.path.exists(checkpoint):
                 from src.model import LightDensityNet
                 print(f"[VisionDetector] Loading DensityNet checkpoint: {checkpoint} on {self.device}...")
                 self.density_net = LightDensityNet().to(self.device)
-                self.density_net.load_state_dict(torch.load(checkpoint, map_location=self.device))
+                self.density_net.load_state_dict(torch.load(checkpoint, map_location=self.device, weights_only=True))
                 self.density_net.eval()
             else:
                 if self.backend == "density":
@@ -67,6 +101,33 @@ class VisionDetector:
                 self.backend = "yolo"
 
         print(f"[VisionDetector] Initialized with backend: '{self.backend}' | Zones Enabled: {enable_zones}")
+
+    def set_zone_bbox(self, bbox):
+        """Dynamically update restricted zone bounds [xmin, ymin, xmax, ymax]."""
+        if self.zone is not None:
+            self.zone.set_bbox(bbox)
+
+    def set_zone_preset(self, preset_name):
+        """Dynamically set zone preset."""
+        if self.zone is not None:
+            self.zone.set_preset(preset_name)
+
+    def get_zone_config(self):
+        """Get current zone configuration."""
+        if self.zone is not None:
+            return self.zone.get_config()
+        return {"name": "None", "bbox": [0, 0, 0, 0], "loiter_threshold_sec": 0}
+
+    def auto_detect_pool_zone(self, frame):
+        """Scans frame for swimming pool water body and locks it as the restricted safety zone."""
+        found, bbox, poly = self.pool_detector.detect_pool(frame)
+        if found and self.zone is not None:
+            self.zone.name = "🏊 Swimming Pool Safety Zone"
+            self.zone.set_bbox(bbox)
+            self.pool_locked = True
+            print(f"[SwimmingPoolDetector] Successfully locked onto pool boundary at: {bbox}")
+            return {"status": "success", "detected": True, "bbox": bbox}
+        return {"status": "no_pool_detected", "detected": False, "bbox": None}
 
     def detect(self, frame, draw_annotations=True):
         """
@@ -77,6 +138,10 @@ class VisionDetector:
             detections (list): Detailed list of detected bounding boxes and tracking IDs.
             stats (dict): Additional metrics (animals, vehicles, loitering alerts, etc.).
         """
+        # Automatic swimming pool discovery on initial frames if enabled
+        if self.auto_pool_enabled and not self.pool_locked:
+            self.auto_detect_pool_zone(frame)
+
         if self.backend == "yolo":
             return self._detect_yolo(frame, draw_annotations)
         elif self.backend == "density":

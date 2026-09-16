@@ -3,8 +3,8 @@ Alexa Skill Lambda handler for "Crowd Density Monitor".
 
 Voice interactions supported:
   "Alexa, ask crowd monitor what's the density"
-      -> queries the central server's HTTP API, speaks back count + tier
-  "Alexa, ask crowd monitor if zone one is busy"
+      -> queries the central server's HTTP API, speaks back count + tier + loitering alerts
+  "Alexa, ask crowd monitor how busy is it"
       -> same, phrased as a yes/no-style check
 """
 
@@ -35,10 +35,10 @@ def fetch_reading(zone="zone1"):
             url,
             headers={
                 "ngrok-skip-browser-warning": "true",
-                "User-Agent": "Mozilla/5.0 (compatible; AlexaSkill/1.0)"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AlexaSkill/1.0"
             }
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=6) as resp:
             data = resp.read().decode("utf-8")
             return json.loads(data)
     except Exception as e:
@@ -48,23 +48,33 @@ def fetch_reading(zone="zone1"):
 
 def build_density_speech(reading):
     if reading is None:
-        return "Sorry, I couldn't reach the crowd monitoring server right now. Please make sure your server and ngrok tunnel are running."
+        return "Sorry, I couldn't reach the crowd monitoring server right now. Please verify your server and ngrok tunnel are running."
 
-    count = reading.get("count", 0.0)
-    tier = reading.get("tier", "normal")
-    pct = reading.get("density_pct", 0.0)
+    count = float(reading.get("count", 0.0))
+    tier = str(reading.get("tier", "normal")).lower()
+    pct = float(reading.get("density_percentage", reading.get("density_pct", 0.0)))
+    loitering = int(reading.get("loitering", 0))
+    animals = int(reading.get("animals", 0))
 
     tier_phrases = {
         "normal": "It is currently at a normal density level.",
         "busy": "It is getting busy right now.",
-        "critical": "It is at critical density — please be cautious.",
+        "critical": "It is at critical density. Please be cautious.",
     }
-    tier_phrase = tier_phrases.get(tier, "")
+    tier_phrase = tier_phrases.get(tier, "It is currently operating normally.")
 
-    return (
-        f"There are approximately {round(count)} people in the monitored area, "
+    people_word = "person" if round(count) == 1 else "people"
+    speech = (
+        f"There is approximately {round(count)} {people_word} in the monitored area, "
         f"which is about {round(pct)} percent of capacity. {tier_phrase}"
     )
+
+    if loitering > 0:
+        speech += f" Attention: A loitering alert is currently active in the restricted area."
+    elif animals > 0:
+        speech += f" Also, {animals} stray animal is currently detected on site."
+
+    return speech
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +85,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
         return is_request_type("LaunchRequest")(handler_input)
 
     def handle(self, handler_input: HandlerInput) -> Response:
-        speech = "Welcome to Crowd Density Monitor. You can ask me what the current density is, or ask if zone one is busy."
+        speech = "Welcome to Crowd Density Monitor. You can ask me what the current density is, or how busy it is."
         return handler_input.response_builder.speak(speech).ask(speech).response
 
 

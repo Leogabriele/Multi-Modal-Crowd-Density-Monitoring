@@ -19,12 +19,41 @@ class RestrictedZone:
         """
         self.name = name
         self.polygon = polygon
-        self.bbox = bbox  # [xmin, ymin, xmax, ymax]
+        # Default cleaner center box (40% width x 60% height) instead of full 80% screen
+        self.bbox = bbox if bbox is not None else [0.30, 0.20, 0.70, 0.80]
         self.loiter_threshold_sec = loiter_threshold_sec
 
         # State tracking: track_id -> entry_timestamp
         self.tracked_objects_entry = {}
         self.active_alerts = {}
+
+    def set_bbox(self, bbox):
+        """Update zone bounding box [xmin, ymin, xmax, ymax] dynamically."""
+        if len(bbox) == 4:
+            self.bbox = [float(b) for b in bbox]
+            self.polygon = None  # Use bbox
+            print(f"[RestrictedZone] Updated zone coordinates to: {self.bbox}")
+
+    def set_preset(self, preset_name):
+        """Set predefined zone preset."""
+        presets = {
+            "center_small": [0.35, 0.30, 0.65, 0.70],     # Compact center (30% width)
+            "center_medium": [0.25, 0.20, 0.75, 0.80],    # Standard center (50% width)
+            "left_half": [0.05, 0.10, 0.48, 0.90],        # Left hallway/entrance
+            "right_half": [0.52, 0.10, 0.95, 0.90],       # Right hallway/entrance
+            "doorway": [0.30, 0.45, 0.70, 0.95],          # Lower doorway/gate area
+            "custom": self.bbox
+        }
+        if preset_name in presets:
+            self.set_bbox(presets[preset_name])
+
+    def get_config(self):
+        """Returns current zone configuration."""
+        return {
+            "name": self.name,
+            "bbox": self.bbox,
+            "loiter_threshold_sec": self.loiter_threshold_sec
+        }
 
     def _get_pixel_polygon(self, frame_w, frame_h):
         if self.polygon is not None:
@@ -40,9 +69,8 @@ class RestrictedZone:
                 x1, y1, x2, y2 = int(b[0]), int(b[1]), int(b[2]), int(b[3])
             return np.array([(x1, y1), (x2, y1), (x2, y2), (x1, y2)], np.int32)
         else:
-            # Default center restricted zone (covers 15% to 85% width, 10% to 95% height)
-            x1, y1 = int(frame_w * 0.15), int(frame_h * 0.10)
-            x2, y2 = int(frame_w * 0.85), int(frame_h * 0.95)
+            x1, y1 = int(frame_w * 0.30), int(frame_h * 0.20)
+            x2, y2 = int(frame_w * 0.70), int(frame_h * 0.80)
             return np.array([(x1, y1), (x2, y1), (x2, y2), (x1, y2)], np.int32)
 
     def is_point_inside(self, point, frame_w, frame_h):

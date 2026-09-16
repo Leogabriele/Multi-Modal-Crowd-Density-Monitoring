@@ -1,37 +1,16 @@
-Restart Project Checklist
--------------------------------------
--------------------------------------
+Different Models
 
-1. Start the central server
-
+1️⃣ Real Crowd Density CNN (ShanghaiTech Trained)
 cd D:\project\core\server
+python server.py --backend density --camera 1
 
-python server.py --checkpoint "D:\project\modules\crowd_density\models\density_synthetic_density.pt"
+2️⃣ YOLO Persistent Tracking & Loitering (Micro-Surveillance)
+python server.py --backend yolo --camera 1 --loiter-time 5
 
---------------------
+3️⃣ Dual-Paradigm Hybrid Mode (Academic Novelty)
+python server.py --backend hybrid --camera 1 --loiter-time 5
 
-Verify from another PowerShell:
-
-curl.exe http://localhost:8000/health
-
-expected: {"status":"ok"}
-
-------------------------------------------
------------------------------------------
-
-2. ngrok http 8000
-
-Test it: 
-curl.exe -H "ngrok-skip-browser-warning: true" https://YOUR-NGROK-URL/health
-
-********************************
-⚠️ If the ngrok URL changed
-API_BASE_URL = "https://YOUR-NEW-NGROK-URL"
-********************************
-
-3. Start/check your MQTT broker
-
-Check:
+---------------------------------
 
 netstat -ano | findstr :1883
 
@@ -53,11 +32,6 @@ ESP8266
 Alexa/Lambda
 
 ---------------------------------------
-
-Test MQTT:
-mosquitto_pub -h YOUR-PC-IP -t crowd/zone1/tier -m critical
-
-*********************************************************
 
 Set your Wifi to - GABRIEL
 
@@ -86,5 +60,10 @@ python server.py --backend yolo --camera 1 --loiter-time 5
 
 to check it on screen ---
 http://localhost:8000/
+
+-----------------------------------------------------
+
+cd D:\project\core\server
+python urban_server.py --backend yolo --camera 1 --loiter-time 5
 
 

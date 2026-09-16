@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Dataset files & Archives (Keep repo lightweight)
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.mat
+data/raw/archive/
+data/raw/shanghaitech_part_b/
+data/raw/synthetic_density/
+modules/crowd_density/data/raw/archive/
+modules/crowd_density/data/raw/shanghaitech_part_b/
+modules/crowd_density/data/raw/synthetic_density/
+
+# Large model weights (keep lightweight reference configs)
+*.h5
+*.ckpt
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
