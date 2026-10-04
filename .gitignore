@@ -24,6 +24,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+core/alexa_skill/lambda/package/
 
 # Virtual Environments
 venv/
